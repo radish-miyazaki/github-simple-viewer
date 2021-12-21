@@ -1,0 +1,9 @@
+{
+  "name": "basic-github-viewer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "elm-test": "^0.19.1-revision7"
+  }
+}
