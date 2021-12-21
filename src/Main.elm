@@ -114,16 +114,8 @@ view model =
     }
 
 
-main : Program () Model Msg
-main =
-    Browser.application
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        , onUrlRequest = UrlRequested
-        , onUrlChange = UrlChanged
-        }
+
+-- HELPERS
 
 
 viewNotFound : Html msg
@@ -200,3 +192,19 @@ goTo maybeRoute model =
             ( model
             , Github.getIssue (Result.map RepoPage >> Loaded) userName repoName
             )
+
+
+
+-- MAIN
+
+
+main : Program () Model Msg
+main =
+    Browser.application
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        , onUrlRequest = UrlRequested
+        , onUrlChange = UrlChanged
+        }
