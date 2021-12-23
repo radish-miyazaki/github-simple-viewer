@@ -11,7 +11,7 @@ testParse : String -> String -> Maybe Route -> Test
 testParse name path expectRoute =
     test name <|
         \_ ->
-            Url.fromString path
+            Url.fromString ("http://example.com" ++ path)
                 |> Maybe.andThen Route.parse
                 |> Expect.equal expectRoute
 
