@@ -6,6 +6,7 @@ repl-temp-*
 index.html
 elm.js
 elm.min.js
+.parcel-cache/
 
 # Node.js 関連ファイル
 node_modules/
