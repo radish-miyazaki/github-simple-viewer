@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav
@@ -6,18 +6,20 @@ import Github exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
-import Route exposing (Route(..), parse)
-import Url exposing (Url)
-import Url.Builder
+import Page.Repo
+import Page.Top
+import Page.User
+import Route exposing (Route(..))
+import Url
 import Url.Parser exposing (..)
 
 
 type Page
     = NotFound
     | ErrorPage Http.Error
-    | TopPage
-    | UserPage (List Repo)
-    | RepoPage (List Issue)
+    | TopPage Page.Top.Model
+    | UserPage Page.User.Model
+    | RepoPage Page.Repo.Model
 
 
 
@@ -32,8 +34,8 @@ type alias Model =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    -- 後で画面遷移で使うためのキーを　Modelにもたせておく
-    Model key TopPage
+    -- 後で画面遷移で使うためのキーをModelにもたせておく
+    Model key (TopPage Page.Top.init)
         -- はじめてページを訪れたときもページの初期化を行う
         |> goTo (Route.parse url)
 
@@ -41,7 +43,9 @@ init _ url key =
 type Msg
     = UrlRequested Browser.UrlRequest
     | UrlChanged Url.Url
-    | Loaded (Result Http.Error Page)
+    | TopMsg Page.Top.Msg
+    | UserMsg Page.User.Msg
+    | RepoMsg Page.Repo.Msg
 
 
 
@@ -63,18 +67,47 @@ update msg model =
             -- ページの初期化処理をヘルパ関数に移譲
             goTo (Route.parse url) model
 
-        Loaded result ->
-            ( { model
-                | page =
-                    case result of
-                        Ok page ->
-                            page
+        TopMsg topMsg ->
+            case model.page of
+                TopPage topModel ->
+                    let
+                        ( newTopModel, topCmd ) =
+                            Page.Top.update topMsg topModel
+                    in
+                    ( { model | page = TopPage newTopModel }
+                    , Cmd.map TopMsg topCmd
+                    )
 
-                        Err e ->
-                            ErrorPage e
-              }
-            , Cmd.none
-            )
+                _ ->
+                    ( model, Cmd.none )
+
+        UserMsg userMsg ->
+            case model.page of
+                UserPage userModel ->
+                    let
+                        ( newUserModel, topCmd ) =
+                            Page.User.update userMsg userModel
+                    in
+                    ( { model | page = UserPage newUserModel }
+                    , Cmd.map UserMsg topCmd
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        RepoMsg repoMsg ->
+            case model.page of
+                RepoPage repoModel ->
+                    let
+                        ( newRepoModel, topCmd ) =
+                            Page.Repo.update repoMsg repoModel
+                    in
+                    ( { model | page = RepoPage newRepoModel }
+                    , Cmd.map RepoMsg topCmd
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
 
 
@@ -102,14 +135,17 @@ view model =
             ErrorPage error ->
                 viewError error
 
-            TopPage ->
-                viewTopPage
+            TopPage topPageModel ->
+                Page.Top.view topPageModel
+                    |> Html.map TopMsg
 
-            UserPage repos ->
-                viewUserPage repos
+            UserPage userPageModel ->
+                Page.User.view userPageModel
+                    |> Html.map UserMsg
 
-            RepoPage issues ->
-                viewRepoPage issues
+            RepoPage repoPageModel ->
+                Page.Repo.view repoPageModel
+                    |> Html.map RepoMsg
         ]
     }
 
@@ -133,47 +169,6 @@ viewError error =
             text (Debug.toString error)
 
 
-viewTopPage : Html msg
-viewTopPage =
-    ul []
-        -- ユーザ名一覧は、とりあえず固定
-        [ viewLink (Url.Builder.absolute [ "radish-miyazaki" ] [])
-        , viewLink (Url.Builder.absolute [ "mather" ] [])
-        ]
-
-
-viewUserPage : List Repo -> Html msg
-viewUserPage repos =
-    ul []
-        -- ユーザの持っているRepo一覧を取得
-        (repos
-            |> List.map
-                (\repo ->
-                    viewLink (Url.Builder.absolute [ repo.owner, repo.name ] [])
-                )
-        )
-
-
-viewRepoPage : List Issue -> Html msg
-viewRepoPage issues =
-    -- リポジトリのIssue一覧を取得
-    ul [] (List.map viewIssue issues)
-
-
-viewIssue : Issue -> Html msg
-viewIssue issue =
-    li []
-        [ span [] [ text ("[" ++ issue.state ++ "]") ]
-        , span [] [ text ("#" ++ String.fromInt issue.number ++ "#") ]
-        , span [] [ text issue.title ]
-        ]
-
-
-viewLink : String -> Html msg
-viewLink path =
-    li [] [ a [ href path ] [ text path ] ]
-
-
 goTo : Maybe Route -> Model -> ( Model, Cmd Msg )
 goTo maybeRoute model =
     case maybeRoute of
@@ -181,16 +176,24 @@ goTo maybeRoute model =
             ( { model | page = NotFound }, Cmd.none )
 
         Just Route.Top ->
-            ( { model | page = TopPage }, Cmd.none )
+            ( { model | page = TopPage Page.Top.init }, Cmd.none )
 
         Just (Route.User userName) ->
-            ( model
-            , Github.getRepo (Result.map UserPage >> Loaded) userName
+            let
+                ( userModel, userCmd ) =
+                    Page.User.init userName
+            in
+            ( { model | page = UserPage userModel }
+            , Cmd.map UserMsg userCmd
             )
 
         Just (Route.Repo userName repoName) ->
-            ( model
-            , Github.getIssue (Result.map RepoPage >> Loaded) userName repoName
+            let
+                ( repoModel, repoCmd ) =
+                    Page.Repo.init userName repoName
+            in
+            ( { model | page = RepoPage repoModel }
+            , Cmd.map RepoMsg repoCmd
             )
 
 

@@ -1,4 +1,4 @@
-module Github exposing (Issue, Repo, getIssue, getRepo)
+module Github exposing (Issue, Repo, User, getIssues, getRepos, issueUrl, searchUsers)
 
 import Http
 import Json.Decode as D exposing (Decoder)
@@ -24,6 +24,12 @@ type alias Issue =
     { number : Int
     , title : String
     , state : String
+    }
+
+
+type alias User =
+    { login : String
+    , avatarUrl : String
     }
 
 
@@ -61,12 +67,41 @@ issueDecoder =
         (D.field "state" D.string)
 
 
+usersDecorder : Decoder (List User)
+usersDecorder =
+    D.list userDecorder
+
+
+userDecorder : Decoder User
+userDecorder =
+    D.map2 User
+        (D.field "login" D.string)
+        (D.field "avatar_url" D.string)
+
+
+searchUsersDecorder : Decoder (List User)
+searchUsersDecorder =
+    D.field "items" usersDecorder
+
+
 
 -- API
 
 
-getRepo : (Result Http.Error (List Repo) -> msg) -> String -> Cmd msg
-getRepo toMsg userName =
+searchUsers : (Result Http.Error (List User) -> msg) -> String -> Cmd msg
+searchUsers toMsg userName =
+    Http.get
+        { url =
+            Url.Builder.crossOrigin "https://api.github.com"
+                [ "search", "users" ]
+                [ Url.Builder.string "q" userName ]
+        , expect =
+            Http.expectJson toMsg searchUsersDecorder
+        }
+
+
+getRepos : (Result Http.Error (List Repo) -> msg) -> String -> Cmd msg
+getRepos toMsg userName =
     Http.get
         { url =
             Url.Builder.crossOrigin "https://api.github.com"
@@ -77,8 +112,8 @@ getRepo toMsg userName =
         }
 
 
-getIssue : (Result Http.Error (List Issue) -> msg) -> String -> String -> Cmd msg
-getIssue toMsg userName repoName =
+getIssues : (Result Http.Error (List Issue) -> msg) -> String -> String -> Cmd msg
+getIssues toMsg userName repoName =
     Http.get
         { url =
             Url.Builder.crossOrigin "https://api.github.com"
@@ -87,3 +122,10 @@ getIssue toMsg userName repoName =
         , expect =
             Http.expectJson toMsg issuesDecorder
         }
+
+
+issueUrl : String -> String -> Int -> String
+issueUrl userName repoName issueNumber =
+    Url.Builder.crossOrigin "https://github.com"
+        [ userName, repoName, "issues", String.fromInt issueNumber ]
+        []
